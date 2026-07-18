@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">ThieftProtection</string>
+    <string name="device_admin_label">SignalLock Anti-Theft Admin</string>
+    <string name="device_admin_description">Allows SignalLock to lock the screen when a theft SMS is received.</string>
 </resources>
