@@ -24,7 +24,9 @@ import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
@@ -246,19 +248,45 @@ class AntiTheftService : Service() {
         overlayView = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#FA0B0F19"))
 
-            val textView = TextView(this.context).apply {
-                text = "⚠️ SIGNAL LOCKDOWN ACTIVE ⚠️\n\nThis device is locked down.\nEnter pattern/password or stop alert via primary auth."
-                setTextColor(Color.WHITE)
-                textSize = 22f
+            val container = LinearLayout(this.context).apply {
+                orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(40, 40, 40, 40)
             }
+
+            val textView = TextView(this.context).apply {
+                text = "⚠️ SIGNAL LOCKDOWN ACTIVE ⚠️\n\nThis device is locked down.\nTouch options & sound alarms are active."
+                setTextColor(Color.WHITE)
+                textSize = 20f
+                gravity = Gravity.CENTER
+            }
+            container.addView(textView)
+
+            // Test / Emergency Deactivation Button inside Overlay
+            val stopButton = Button(this.context).apply {
+                text = "🛑 DEACTIVATE ALARM (END OVERLAY)"
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#C0392B"))
+                setPadding(30, 20, 30, 20)
+                setOnClickListener {
+                    Log.d("AntiTheftService", "Deactivate button clicked inside overlay. Stopping service.")
+                    stopSelf()
+                }
+            }
+            val buttonParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 50
+            }
+            container.addView(stopButton, buttonParams)
+
             val layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER
             )
-            addView(textView, layoutParams)
+            addView(container, layoutParams)
         }
 
         val params = WindowManager.LayoutParams(
@@ -270,8 +298,7 @@ class AntiTheftService : Service() {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,

@@ -15,6 +15,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class DataStoreManager(private val context: Context) {
     companion object {
         val TRIGGER_PHRASE = stringPreferencesKey("trigger_phrase")
+        val STOP_PHRASE = stringPreferencesKey("stop_phrase")
         val TTS_MESSAGE = stringPreferencesKey("tts_message")
 
         val ENABLE_NETWORK_LOCATION = booleanPreferencesKey("enable_network_location")
@@ -26,6 +27,10 @@ class DataStoreManager(private val context: Context) {
 
     val triggerPhraseFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[TRIGGER_PHRASE] ?: "SECURE_LOCK"
+    }
+
+    val stopPhraseFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[STOP_PHRASE] ?: "STOP_LOCK"
     }
 
     val ttsMessageFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -55,6 +60,12 @@ class DataStoreManager(private val context: Context) {
     suspend fun saveTriggerPhrase(phrase: String) {
         context.dataStore.edit { preferences ->
             preferences[TRIGGER_PHRASE] = phrase
+        }
+    }
+
+    suspend fun saveStopPhrase(phrase: String) {
+        context.dataStore.edit { preferences ->
+            preferences[STOP_PHRASE] = phrase
         }
     }
 

@@ -21,18 +21,26 @@ class SmsTriggerReceiver : BroadcastReceiver() {
 
                     val dataStoreManager = DataStoreManager(context)
                     val triggerPhrase = dataStoreManager.triggerPhraseFlow.first()
-                    
+                    val stopPhrase = dataStoreManager.stopPhraseFlow.first()
+
                     for (sms in messages) {
-                        val body = sms.messageBody
-                        if (body != null && body.trim().equals(triggerPhrase.trim(), ignoreCase = true)) {
-                            Log.d("SmsTriggerReceiver", "Trigger match found! Starting AntiTheftService.")
+                        val body = sms.messageBody ?: continue
+                        val cleanBody = body.trim()
+
+                        if (cleanBody.equals(stopPhrase.trim(), ignoreCase = true)) {
+                            Log.d("SmsTriggerReceiver", "Stop phrase match found! Deactivating AntiTheftService.")
+                            val serviceIntent = Intent(context, AntiTheftService::class.java)
+                            context.stopService(serviceIntent)
+                            break
+                        } else if (cleanBody.equals(triggerPhrase.trim(), ignoreCase = true)) {
+                            Log.d("SmsTriggerReceiver", "Trigger phrase match found! Starting AntiTheftService.")
                             val serviceIntent = Intent(context, AntiTheftService::class.java)
                             context.startForegroundService(serviceIntent)
                             break
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("SmsTriggerReceiver", "Error intercepting SMS trigger phrase", e)
+                    Log.e("SmsTriggerReceiver", "Error intercepting SMS phrase", e)
                 } finally {
                     pendingResult.finish()
                 }

@@ -78,6 +78,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
 
     // Settings & Feature Toggle states loaded safely via collectAsState
     val savedTriggerPhrase by dataStoreManager.triggerPhraseFlow.collectAsState(initial = "SECURE_LOCK")
+    val savedStopPhrase by dataStoreManager.stopPhraseFlow.collectAsState(initial = "STOP_LOCK")
     val savedTtsMessage by dataStoreManager.ttsMessageFlow.collectAsState(initial = "This device is stolen! Police are on the way!")
 
     val enableNetworkLocation by dataStoreManager.enableNetworkLocationFlow.collectAsState(initial = true)
@@ -87,6 +88,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
     val enableScreenLock by dataStoreManager.enableScreenLockFlow.collectAsState(initial = true)
 
     var triggerPhrase by remember(savedTriggerPhrase) { mutableStateOf(savedTriggerPhrase) }
+    var stopPhrase by remember(savedStopPhrase) { mutableStateOf(savedStopPhrase) }
     var ttsMessage by remember(savedTtsMessage) { mutableStateOf(savedTtsMessage) }
 
     // Permission states
@@ -286,6 +288,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
         MainDashboardScreen(
             isServiceRunning = isServiceRunning,
             triggerPhrase = triggerPhrase,
+            stopPhrase = stopPhrase,
             ttsMessage = ttsMessage,
             enableNetworkLocation = enableNetworkLocation,
             enableSoundAlarm = enableSoundAlarm,
@@ -296,6 +299,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
             hasOverlayPermission = hasOverlayPermission,
             hasDeviceAdmin = hasDeviceAdmin,
             onTriggerPhraseChange = { triggerPhrase = it },
+            onStopPhraseChange = { stopPhrase = it },
             onTtsMessageChange = { ttsMessage = it },
             onToggleNetworkLocation = { coroutineScope.launch { dataStoreManager.saveEnableNetworkLocation(it) } },
             onToggleSoundAlarm = { coroutineScope.launch { dataStoreManager.saveEnableSoundAlarm(it) } },
@@ -305,6 +309,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
             onSaveSettings = {
                 coroutineScope.launch {
                     dataStoreManager.saveTriggerPhrase(triggerPhrase)
+                    dataStoreManager.saveStopPhrase(stopPhrase)
                     dataStoreManager.saveTtsMessage(ttsMessage)
                     Toast.makeText(context, "Settings Saved Successfully!", Toast.LENGTH_SHORT).show()
                 }
@@ -342,6 +347,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
 fun MainDashboardScreen(
     isServiceRunning: Boolean,
     triggerPhrase: String,
+    stopPhrase: String,
     ttsMessage: String,
     enableNetworkLocation: Boolean,
     enableSoundAlarm: Boolean,
@@ -352,6 +358,7 @@ fun MainDashboardScreen(
     hasOverlayPermission: Boolean,
     hasDeviceAdmin: Boolean,
     onTriggerPhraseChange: (String) -> Unit,
+    onStopPhraseChange: (String) -> Unit,
     onTtsMessageChange: (String) -> Unit,
     onToggleNetworkLocation: (Boolean) -> Unit,
     onToggleSoundAlarm: (Boolean) -> Unit,
@@ -417,69 +424,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 1: System Status Card
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = BeigeCard),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BeigeBorder)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "SYSTEM STATUS",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MossGreenSecondary,
-                        letterSpacing = 1.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(if (isServiceRunning) AlertRed else StatusGreen)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isServiceRunning) "ALARM ACTIVE - DEVICE LOCKED" else "MONITORING ACTIVE (STANDBY)",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isServiceRunning) AlertRed else StatusGreen
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = onToggleTestService,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isServiceRunning) StatusGreen else AlertRed,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = if (isServiceRunning) "Deactivate Alarm Service" else "Trigger Test Anti-Theft Alert",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Card 2: Feature Customization Toggles Card
+            // Card 1: Feature Customization Toggles Card
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -553,7 +498,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 3: Permissions Overview & Instruction Entry Card
+            // Card 2: Permissions Overview & Instruction Entry Card
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -614,7 +559,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 4: Configuration Card (SMS phrase & TTS Message)
+            // Card 3: Configuration Card (Trigger & Stop SMS Phrases + TTS Message)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -623,7 +568,7 @@ fun MainDashboardScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "TRIGGER CONFIGURATION",
+                        text = "SMS TRIGGER & STOP CONFIGURATION",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MossGreenSecondary,
@@ -635,8 +580,26 @@ fun MainDashboardScreen(
                     OutlinedTextField(
                         value = triggerPhrase,
                         onValueChange = onTriggerPhraseChange,
-                        label = { Text("SMS Trigger Phrase") },
+                        label = { Text("SMS Trigger Phrase (Start Alarm)") },
                         placeholder = { Text("e.g. SECURE_LOCK") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MossGreenPrimary,
+                            unfocusedBorderColor = BeigeBorder,
+                            focusedLabelColor = MossGreenSecondary,
+                            focusedTextColor = TextDarkForest,
+                            unfocusedTextColor = TextDarkForest
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = stopPhrase,
+                        onValueChange = onStopPhraseChange,
+                        label = { Text("SMS Stop Phrase (Deactivate Alarm)") },
+                        placeholder = { Text("e.g. STOP_LOCK") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MossGreenPrimary,
@@ -684,7 +647,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 5: Security ADB Command Reference
+            // Card 4: Security ADB Command Reference
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -717,6 +680,68 @@ fun MainDashboardScreen(
                             fontWeight = FontWeight.Bold,
                             color = MossGreenPrimary,
                             modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Card 5: System Status & Manual Alarm Test (Moved to Bottom to Prevent Accidental Clicks)
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = BeigeCard),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BeigeBorder)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "SYSTEM STATUS & ALARM TEST",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MossGreenSecondary,
+                        letterSpacing = 1.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(if (isServiceRunning) AlertRed else StatusGreen)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isServiceRunning) "ALARM ACTIVE - DEVICE LOCKED" else "MONITORING ACTIVE (STANDBY)",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isServiceRunning) AlertRed else StatusGreen
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = onToggleTestService,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isServiceRunning) StatusGreen else AlertRed,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (isServiceRunning) "Deactivate Alarm Service" else "Trigger Test Anti-Theft Alert",
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
