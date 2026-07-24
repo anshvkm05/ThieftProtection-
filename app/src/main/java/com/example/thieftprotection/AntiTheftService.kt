@@ -63,25 +63,40 @@ class AntiTheftService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundServiceWithNotification()
 
-        // 1. Lock screen immediately (Requires Device Admin)
-        lockScreen()
-
-        // 2. Load settings and launch loops
         serviceScope.launch {
             val dataStoreManager = DataStoreManager(applicationContext)
             val ttsMessage = dataStoreManager.ttsMessageFlow.first()
+            val enableNetworkLocation = dataStoreManager.enableNetworkLocationFlow.first()
+            val enableScreenLock = dataStoreManager.enableScreenLockFlow.first()
+            val enableSoundAlarm = dataStoreManager.enableSoundAlarmFlow.first()
+            val enableFlashStrobe = dataStoreManager.enableFlashStrobeFlow.first()
+            val enableOverlay = dataStoreManager.enableOverlayFlow.first()
 
-            // 3. Initialize looping TTS
-            initTextToSpeech(ttsMessage)
+            // 1. Auto-Activate Wi-Fi, Mobile Data & Location (GPS) if enabled
+            if (enableNetworkLocation) {
+                NetworkLocationManager.activateNetworkAndLocation(applicationContext)
+            }
 
-            // 4. Force Max Volume Loop
-            startVolumeMaxLoop()
+            // 2. Lock screen if enabled
+            if (enableScreenLock) {
+                lockScreen()
+            }
 
-            // 5. Start Torch Flashing Loop
-            startFlashlightLoop()
+            // 3. Initialize looping TTS & Volume Override if enabled
+            if (enableSoundAlarm) {
+                initTextToSpeech(ttsMessage)
+                startVolumeMaxLoop()
+            }
 
-            // 6. Draw Fullscreen Overlay
-            showFullscreenOverlay()
+            // 4. Start Torch Flashing Loop if enabled
+            if (enableFlashStrobe) {
+                startFlashlightLoop()
+            }
+
+            // 5. Draw Fullscreen Security Overlay if enabled
+            if (enableOverlay) {
+                showFullscreenOverlay()
+            }
         }
 
         return START_STICKY
@@ -114,7 +129,7 @@ class AntiTheftService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("SignalLock Active")
-            .setContentText("Your device is locked. Touch settings are restricted.")
+            .setContentText("Your anti-theft monitoring and alarm service is active.")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -153,8 +168,7 @@ class AntiTheftService : Service() {
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
                 tts?.setAudioAttributes(audioAttributes)
-                
-                // Looping speech coroutine
+
                 serviceScope.launch {
                     while (true) {
                         if (isTtsReady) {
@@ -163,7 +177,7 @@ class AntiTheftService : Service() {
                             }
                             tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "SignalLockTTS")
                         }
-                        delay(6000) // Repeat every 6 seconds
+                        delay(6000)
                     }
                 }
             } else {
@@ -230,8 +244,8 @@ class AntiTheftService : Service() {
 
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         overlayView = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#FA0B0F19")) // Elegant premium glassmorphic/dark color
-            
+            setBackgroundColor(Color.parseColor("#FA0B0F19"))
+
             val textView = TextView(this.context).apply {
                 text = "⚠️ SIGNAL LOCKDOWN ACTIVE ⚠️\n\nThis device is locked down.\nEnter pattern/password or stop alert via primary auth."
                 setTextColor(Color.WHITE)

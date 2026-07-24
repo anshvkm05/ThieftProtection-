@@ -17,7 +17,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -77,9 +76,15 @@ fun MainContainerScreen(refreshTrigger: Int) {
     // Service running state
     val isServiceRunning by AntiTheftService.isRunning.collectAsState()
 
-    // Settings states loaded safely via collectAsState with instant fallback defaults
+    // Settings & Feature Toggle states loaded safely via collectAsState
     val savedTriggerPhrase by dataStoreManager.triggerPhraseFlow.collectAsState(initial = "SECURE_LOCK")
     val savedTtsMessage by dataStoreManager.ttsMessageFlow.collectAsState(initial = "This device is stolen! Police are on the way!")
+
+    val enableNetworkLocation by dataStoreManager.enableNetworkLocationFlow.collectAsState(initial = true)
+    val enableSoundAlarm by dataStoreManager.enableSoundAlarmFlow.collectAsState(initial = true)
+    val enableFlashStrobe by dataStoreManager.enableFlashStrobeFlow.collectAsState(initial = true)
+    val enableOverlay by dataStoreManager.enableOverlayFlow.collectAsState(initial = true)
+    val enableScreenLock by dataStoreManager.enableScreenLockFlow.collectAsState(initial = true)
 
     var triggerPhrase by remember(savedTriggerPhrase) { mutableStateOf(savedTriggerPhrase) }
     var ttsMessage by remember(savedTtsMessage) { mutableStateOf(savedTtsMessage) }
@@ -165,8 +170,8 @@ fun MainContainerScreen(refreshTrigger: Int) {
             whyRequiredText = "Allows SignalLock to execute DevicePolicyManager.lockNow() to lock the phone screen immediately upon receiving a trigger SMS, securing user data from unauthorized access.",
             howToAllowSteps = listOf(
                 "Tap 'Grant' below to open Device Admin settings.",
-                "Review the lock screen capability notice.",
-                "Tap 'Activate this device admin app' at the bottom of the screen."
+                "Review the lock screen capability notice and tap 'Activate'.",
+                "WSA / Headless Alt: Run 'adb shell dpm set-active-admin com.example.thieftprotection/.SignalLockAdminReceiver'"
             ),
             isGranted = hasDeviceAdmin
         ),
@@ -177,7 +182,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
             title = "System Alert Overlay",
             subtitle = "Block thief touch & power menu interactions",
             icon = Icons.Default.Lock,
-            whyRequiredText = "Draws a persistent full-screen security overlay over lock screens and power options. This prevents thieves from powering off the phone or altering quick settings during an active alarm.",
+            whyRequiredText = "Draws a persistent full-screen security overlay over lock screens and power options. This prevents thieves from turning off the phone or altering quick settings during an active alarm.",
             howToAllowSteps = listOf(
                 "Tap 'Grant' below to open Android Special App Access settings.",
                 "Locate SignalLock in the app list.",
@@ -282,11 +287,21 @@ fun MainContainerScreen(refreshTrigger: Int) {
             isServiceRunning = isServiceRunning,
             triggerPhrase = triggerPhrase,
             ttsMessage = ttsMessage,
+            enableNetworkLocation = enableNetworkLocation,
+            enableSoundAlarm = enableSoundAlarm,
+            enableFlashStrobe = enableFlashStrobe,
+            enableOverlay = enableOverlay,
+            enableScreenLock = enableScreenLock,
             permissionSteps = permissionSteps,
             hasOverlayPermission = hasOverlayPermission,
             hasDeviceAdmin = hasDeviceAdmin,
             onTriggerPhraseChange = { triggerPhrase = it },
             onTtsMessageChange = { ttsMessage = it },
+            onToggleNetworkLocation = { coroutineScope.launch { dataStoreManager.saveEnableNetworkLocation(it) } },
+            onToggleSoundAlarm = { coroutineScope.launch { dataStoreManager.saveEnableSoundAlarm(it) } },
+            onToggleFlashStrobe = { coroutineScope.launch { dataStoreManager.saveEnableFlashStrobe(it) } },
+            onToggleOverlay = { coroutineScope.launch { dataStoreManager.saveEnableOverlay(it) } },
+            onToggleScreenLock = { coroutineScope.launch { dataStoreManager.saveEnableScreenLock(it) } },
             onSaveSettings = {
                 coroutineScope.launch {
                     dataStoreManager.saveTriggerPhrase(triggerPhrase)
@@ -328,11 +343,21 @@ fun MainDashboardScreen(
     isServiceRunning: Boolean,
     triggerPhrase: String,
     ttsMessage: String,
+    enableNetworkLocation: Boolean,
+    enableSoundAlarm: Boolean,
+    enableFlashStrobe: Boolean,
+    enableOverlay: Boolean,
+    enableScreenLock: Boolean,
     permissionSteps: List<PermissionStepInfo>,
     hasOverlayPermission: Boolean,
     hasDeviceAdmin: Boolean,
     onTriggerPhraseChange: (String) -> Unit,
     onTtsMessageChange: (String) -> Unit,
+    onToggleNetworkLocation: (Boolean) -> Unit,
+    onToggleSoundAlarm: (Boolean) -> Unit,
+    onToggleFlashStrobe: (Boolean) -> Unit,
+    onToggleOverlay: (Boolean) -> Unit,
+    onToggleScreenLock: (Boolean) -> Unit,
     onSaveSettings: () -> Unit,
     onOpenInstructionStep: (Int) -> Unit,
     onStartPermissionWalkthrough: () -> Unit,
@@ -454,7 +479,81 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 2: Permissions Overview & Dedicated Instruction Entry Card
+            // Card 2: Feature Customization Toggles Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = BeigeCard),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BeigeBorder)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "ALARM FEATURE TOGGLES",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MossGreenSecondary,
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        text = "Customize active protections upon SMS alarm trigger",
+                        fontSize = 12.sp,
+                        color = TextMutedForest,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    FeatureToggleRow(
+                        title = "Auto Network & GPS",
+                        subtitle = "Activate Wi-Fi, Mobile Data & Location on trigger",
+                        icon = Icons.Default.Wifi,
+                        checked = enableNetworkLocation,
+                        onCheckedChange = onToggleNetworkLocation
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "Sound Alarm & TTS",
+                        subtitle = "Loop spoken alarm text at maximum volume",
+                        icon = Icons.Default.VolumeUp,
+                        checked = enableSoundAlarm,
+                        onCheckedChange = onToggleSoundAlarm
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "Flashlight Strobe Beacon",
+                        subtitle = "Rapidly flash back camera torch light",
+                        icon = Icons.Default.FlashlightOn,
+                        checked = enableFlashStrobe,
+                        onCheckedChange = onToggleFlashStrobe
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "Security Screen Overlay",
+                        subtitle = "Display full-screen touch-blocking overlay",
+                        icon = Icons.Default.Lock,
+                        checked = enableOverlay,
+                        onCheckedChange = onToggleOverlay
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "Instant Screen Lockdown",
+                        subtitle = "Lock screen immediately via Device Admin",
+                        icon = Icons.Default.Security,
+                        checked = enableScreenLock,
+                        onCheckedChange = onToggleScreenLock
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Card 3: Permissions Overview & Instruction Entry Card
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -515,7 +614,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 3: Configuration Card (SMS phrase & TTS Message)
+            // Card 4: Configuration Card (SMS phrase & TTS Message)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -524,7 +623,7 @@ fun MainDashboardScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "CONFIGURATION",
+                        text = "TRIGGER CONFIGURATION",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MossGreenSecondary,
@@ -585,7 +684,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 4: Security ADB Command Reference
+            // Card 5: Security ADB Command Reference
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -602,7 +701,7 @@ fun MainDashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Grant WRITE_SECURE_SETTINGS via ADB to allow disabling Wi-Fi/Mobile Data automatically when stolen:",
+                        text = "Grant WRITE_SECURE_SETTINGS via ADB to allow auto-enabling Wi-Fi, Mobile Data & GPS when stolen:",
                         fontSize = 13.sp,
                         color = TextMutedForest
                     )
@@ -623,6 +722,64 @@ fun MainDashboardScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FeatureToggleRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = if (checked) MossGreenLight else BeigeSurface,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (checked) MossGreenPrimary else TextMutedForest,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextDarkForest
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = TextMutedForest
+            )
+        }
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = MossGreenPrimary,
+                uncheckedThumbColor = TextMutedForest,
+                uncheckedTrackColor = BeigeSurface
+            )
+        )
     }
 }
 
