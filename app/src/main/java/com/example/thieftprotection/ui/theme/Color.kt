@@ -2,10 +2,23 @@ package com.example.thieftprotection.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Beige & Moss Green Brand Palette
+val BeigeBackground = Color(0xFFF7F5EE)
+val BeigeSurface = Color(0xFFEFEBE0)
+val BeigeCard = Color(0xFFFCFAF5)
+val BeigeBorder = Color(0xFFDFD9C9)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val MossGreenPrimary = Color(0xFF2E4031)
+val MossGreenSecondary = Color(0xFF4A634E)
+val MossGreenLight = Color(0xFFE3EDE4)
+val MossGreenAccent = Color(0xFF68856B)
+
+val TextDarkForest = Color(0xFF1B261C)
+val TextMutedForest = Color(0xFF566357)
+
+val AlertRed = Color(0xFFC0392B)
+val AlertRedLight = Color(0xFFFADBD8)
+val StatusGreen = Color(0xFF27AE60)
+val StatusGreenLight = Color(0xFFD4EFDF)
+val WarningAmber = Color(0xFFD35400)
+val WarningAmberLight = Color(0xFFFDEBD0)
