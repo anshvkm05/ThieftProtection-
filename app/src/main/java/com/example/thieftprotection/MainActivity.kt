@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.thieftprotection.ui.PermissionInstructionScreen
 import com.example.thieftprotection.ui.PermissionStepInfo
@@ -87,6 +88,13 @@ fun MainContainerScreen(refreshTrigger: Int) {
     val enableOverlay by dataStoreManager.enableOverlayFlow.collectAsState(initial = true)
     val enableScreenLock by dataStoreManager.enableScreenLockFlow.collectAsState(initial = true)
 
+    // Messaging App Toggles
+    val listenDefaultSms by dataStoreManager.listenDefaultSmsFlow.collectAsState(initial = true)
+    val listenWhatsapp by dataStoreManager.listenWhatsappFlow.collectAsState(initial = true)
+    val listenTelegram by dataStoreManager.listenTelegramFlow.collectAsState(initial = true)
+    val listenInstagram by dataStoreManager.listenInstagramFlow.collectAsState(initial = true)
+    val listenX by dataStoreManager.listenXFlow.collectAsState(initial = true)
+
     var triggerPhrase by remember(savedTriggerPhrase) { mutableStateOf(savedTriggerPhrase) }
     var stopPhrase by remember(savedStopPhrase) { mutableStateOf(savedStopPhrase) }
     var ttsMessage by remember(savedTtsMessage) { mutableStateOf(savedTtsMessage) }
@@ -98,6 +106,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
     var hasSmsPermission by remember { mutableStateOf(false) }
     var hasCameraPermission by remember { mutableStateOf(false) }
     var hasNotificationPermission by remember { mutableStateOf(false) }
+    var hasNotificationListener by remember { mutableStateOf(false) }
     var hasOverlayPermission by remember { mutableStateOf(false) }
     var hasDeviceAdmin by remember { mutableStateOf(false) }
 
@@ -110,6 +119,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
         } else {
             true
         }
+        hasNotificationListener = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
         hasOverlayPermission = Settings.canDrawOverlays(context)
         hasDeviceAdmin = devicePolicyManager.isAdminActive(adminComponent)
     }
@@ -142,7 +152,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
         }
     }
 
-    // Navigation state: null = Main Dashboard, 0..4 = Permission Instruction Screen step
+    // Navigation state: null = Main Dashboard, 0..5 = Permission Instruction Screen step
     var activePermissionStep by remember { mutableStateOf<Int?>(null) }
 
     // List of permission steps
@@ -150,7 +160,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
         PermissionStepInfo(
             type = PermissionType.SMS,
             stepIndex = 0,
-            totalSteps = 5,
+            totalSteps = 6,
             title = "SMS Interception",
             subtitle = "Detect emergency SMS triggers when lost",
             icon = Icons.Default.Sms,
@@ -163,9 +173,25 @@ fun MainContainerScreen(refreshTrigger: Int) {
             isGranted = hasSmsPermission
         ),
         PermissionStepInfo(
-            type = PermissionType.DEVICE_ADMIN,
+            type = PermissionType.NOTIFICATION_LISTENER,
             stepIndex = 1,
-            totalSteps = 5,
+            totalSteps = 6,
+            title = "Notification Access (RCS, WhatsApp, Telegram, etc)",
+            subtitle = "Detect triggers from default SMS & chat apps",
+            icon = Icons.Default.Chat,
+            whyRequiredText = "Modern Android messaging apps (Google Messages RCS, WhatsApp, Telegram, Instagram, X) receive messages via push notifications. Notification Access allows SignalLock to detect your secret trigger phrase across all chat platforms.",
+            howToAllowSteps = listOf(
+                "Tap 'Grant' below to open Notification Access settings.",
+                "Locate SignalLock in the list and toggle to ON.",
+                "Tap 'Allow' on the confirmation warning prompt.",
+                "WSA / Headless Alt: Run 'adb shell cmd notification allow_listener com.example.thieftprotection/.NotificationTriggerListenerService'"
+            ),
+            isGranted = hasNotificationListener
+        ),
+        PermissionStepInfo(
+            type = PermissionType.DEVICE_ADMIN,
+            stepIndex = 2,
+            totalSteps = 6,
             title = "Device Administrator",
             subtitle = "Lock screen instantly upon theft alert",
             icon = Icons.Default.Security,
@@ -179,8 +205,8 @@ fun MainContainerScreen(refreshTrigger: Int) {
         ),
         PermissionStepInfo(
             type = PermissionType.SYSTEM_OVERLAY,
-            stepIndex = 2,
-            totalSteps = 5,
+            stepIndex = 3,
+            totalSteps = 6,
             title = "System Alert Overlay",
             subtitle = "Block thief touch & power menu interactions",
             icon = Icons.Default.Lock,
@@ -194,8 +220,8 @@ fun MainContainerScreen(refreshTrigger: Int) {
         ),
         PermissionStepInfo(
             type = PermissionType.CAMERA,
-            stepIndex = 3,
-            totalSteps = 5,
+            stepIndex = 4,
+            totalSteps = 6,
             title = "Camera Strobe Beacon",
             subtitle = "Flash camera torch repeatedly in dark",
             icon = Icons.Default.FlashlightOn,
@@ -209,8 +235,8 @@ fun MainContainerScreen(refreshTrigger: Int) {
         ),
         PermissionStepInfo(
             type = PermissionType.NOTIFICATIONS,
-            stepIndex = 4,
-            totalSteps = 5,
+            stepIndex = 5,
+            totalSteps = 6,
             title = "Background Notifications",
             subtitle = "Ensure persistent monitoring on Android 13+",
             icon = Icons.Default.Notifications,
@@ -230,6 +256,10 @@ fun MainContainerScreen(refreshTrigger: Int) {
                 smsLauncher.launch(
                     arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS)
                 )
+            }
+            PermissionType.NOTIFICATION_LISTENER -> {
+                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                context.startActivity(intent)
             }
             PermissionType.DEVICE_ADMIN -> {
                 val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
@@ -295,6 +325,11 @@ fun MainContainerScreen(refreshTrigger: Int) {
             enableFlashStrobe = enableFlashStrobe,
             enableOverlay = enableOverlay,
             enableScreenLock = enableScreenLock,
+            listenDefaultSms = listenDefaultSms,
+            listenWhatsapp = listenWhatsapp,
+            listenTelegram = listenTelegram,
+            listenInstagram = listenInstagram,
+            listenX = listenX,
             permissionSteps = permissionSteps,
             hasOverlayPermission = hasOverlayPermission,
             hasDeviceAdmin = hasDeviceAdmin,
@@ -306,6 +341,11 @@ fun MainContainerScreen(refreshTrigger: Int) {
             onToggleFlashStrobe = { coroutineScope.launch { dataStoreManager.saveEnableFlashStrobe(it) } },
             onToggleOverlay = { coroutineScope.launch { dataStoreManager.saveEnableOverlay(it) } },
             onToggleScreenLock = { coroutineScope.launch { dataStoreManager.saveEnableScreenLock(it) } },
+            onToggleListenDefaultSms = { coroutineScope.launch { dataStoreManager.saveListenDefaultSms(it) } },
+            onToggleListenWhatsapp = { coroutineScope.launch { dataStoreManager.saveListenWhatsapp(it) } },
+            onToggleListenTelegram = { coroutineScope.launch { dataStoreManager.saveListenTelegram(it) } },
+            onToggleListenInstagram = { coroutineScope.launch { dataStoreManager.saveListenInstagram(it) } },
+            onToggleListenX = { coroutineScope.launch { dataStoreManager.saveListenX(it) } },
             onSaveSettings = {
                 coroutineScope.launch {
                     dataStoreManager.saveTriggerPhrase(triggerPhrase)
@@ -354,6 +394,11 @@ fun MainDashboardScreen(
     enableFlashStrobe: Boolean,
     enableOverlay: Boolean,
     enableScreenLock: Boolean,
+    listenDefaultSms: Boolean,
+    listenWhatsapp: Boolean,
+    listenTelegram: Boolean,
+    listenInstagram: Boolean,
+    listenX: Boolean,
     permissionSteps: List<PermissionStepInfo>,
     hasOverlayPermission: Boolean,
     hasDeviceAdmin: Boolean,
@@ -365,6 +410,11 @@ fun MainDashboardScreen(
     onToggleFlashStrobe: (Boolean) -> Unit,
     onToggleOverlay: (Boolean) -> Unit,
     onToggleScreenLock: (Boolean) -> Unit,
+    onToggleListenDefaultSms: (Boolean) -> Unit,
+    onToggleListenWhatsapp: (Boolean) -> Unit,
+    onToggleListenTelegram: (Boolean) -> Unit,
+    onToggleListenInstagram: (Boolean) -> Unit,
+    onToggleListenX: (Boolean) -> Unit,
     onSaveSettings: () -> Unit,
     onOpenInstructionStep: (Int) -> Unit,
     onStartPermissionWalkthrough: () -> Unit,
@@ -424,7 +474,81 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 1: Feature Customization Toggles Card
+            // Card 1: Supported Messaging Platforms Toggle Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = BeigeCard),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BeigeBorder)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "SUPPORTED MESSAGING APPS",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MossGreenSecondary,
+                        letterSpacing = 0.8.sp
+                    )
+                    Text(
+                        text = "Select which app messages can trigger or stop the alarm",
+                        fontSize = 12.sp,
+                        color = TextMutedForest,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    FeatureToggleRow(
+                        title = "Default SMS / RCS App",
+                        subtitle = "Google Messages, Samsung Messages, standard SMS",
+                        icon = Icons.Default.Sms,
+                        checked = listenDefaultSms,
+                        onCheckedChange = onToggleListenDefaultSms
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "WhatsApp & WhatsApp Business",
+                        subtitle = "Detect trigger phrases in WhatsApp chats",
+                        icon = Icons.Default.Chat,
+                        checked = listenWhatsapp,
+                        onCheckedChange = onToggleListenWhatsapp
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "Telegram",
+                        subtitle = "Detect trigger phrases in Telegram messages",
+                        icon = Icons.Default.Send,
+                        checked = listenTelegram,
+                        onCheckedChange = onToggleListenTelegram
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "Instagram Direct",
+                        subtitle = "Detect trigger phrases in Instagram DMs",
+                        icon = Icons.Default.CameraAlt,
+                        checked = listenInstagram,
+                        onCheckedChange = onToggleListenInstagram
+                    )
+
+                    HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
+
+                    FeatureToggleRow(
+                        title = "X (formerly Twitter)",
+                        subtitle = "Detect trigger phrases in X Direct Messages",
+                        icon = Icons.Default.Tag,
+                        checked = listenX,
+                        onCheckedChange = onToggleListenX
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Card 2: Feature Customization Toggles Card
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -440,7 +564,7 @@ fun MainDashboardScreen(
                         letterSpacing = 0.8.sp
                     )
                     Text(
-                        text = "Customize active protections upon SMS alarm trigger",
+                        text = "Customize active protections upon SMS/chat alarm trigger",
                         fontSize = 12.sp,
                         color = TextMutedForest,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -498,7 +622,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 2: Permissions Overview & Instruction Entry Card
+            // Card 3: Permissions Overview & Instruction Entry Card
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -559,7 +683,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 3: Configuration Card (Trigger & Stop SMS Phrases + TTS Message)
+            // Card 4: Configuration Card (Trigger & Stop Phrases + TTS Message)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -568,7 +692,7 @@ fun MainDashboardScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "SMS TRIGGER & STOP CONFIGURATION",
+                        text = "MESSAGE TRIGGER & STOP CONFIGURATION",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MossGreenSecondary,
@@ -580,7 +704,7 @@ fun MainDashboardScreen(
                     OutlinedTextField(
                         value = triggerPhrase,
                         onValueChange = onTriggerPhraseChange,
-                        label = { Text("SMS Trigger Phrase (Start Alarm)") },
+                        label = { Text("Trigger Phrase (Start Alarm)") },
                         placeholder = { Text("e.g. SECURE_LOCK") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -598,7 +722,7 @@ fun MainDashboardScreen(
                     OutlinedTextField(
                         value = stopPhrase,
                         onValueChange = onStopPhraseChange,
-                        label = { Text("SMS Stop Phrase (Deactivate Alarm)") },
+                        label = { Text("Stop Phrase (Deactivate Alarm)") },
                         placeholder = { Text("e.g. STOP_LOCK") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -647,7 +771,7 @@ fun MainDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 4: Security ADB Command Reference
+            // Card 5: Security ADB Command Reference
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -656,7 +780,7 @@ fun MainDashboardScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "OPTIONAL ADB HARDENING",
+                        text = "OPTIONAL ADB HARDENING & NOTIFICATION ACCESS",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MossGreenSecondary,
@@ -664,7 +788,7 @@ fun MainDashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Grant WRITE_SECURE_SETTINGS via ADB to allow auto-enabling Wi-Fi, Mobile Data & GPS when stolen:",
+                        text = "Grant Notification Access and WRITE_SECURE_SETTINGS via ADB:",
                         fontSize = 13.sp,
                         color = TextMutedForest
                     )
@@ -674,20 +798,28 @@ fun MainDashboardScreen(
                         shape = RoundedCornerShape(8.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, BeigeBorder)
                     ) {
-                        Text(
-                            text = "adb shell pm grant com.example.thieftprotection android.permission.WRITE_SECURE_SETTINGS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MossGreenPrimary,
-                            modifier = Modifier.padding(10.dp)
-                        )
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "adb shell cmd notification allow_listener com.example.thieftprotection/.NotificationTriggerListenerService",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MossGreenPrimary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "adb shell pm grant com.example.thieftprotection android.permission.WRITE_SECURE_SETTINGS",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MossGreenPrimary
+                            )
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Card 5: System Status & Manual Alarm Test (Moved to Bottom to Prevent Accidental Clicks)
+            // Card 6: System Status & Manual Alarm Test (At Bottom)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),

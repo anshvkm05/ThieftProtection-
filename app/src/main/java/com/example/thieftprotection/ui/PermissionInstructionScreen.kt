@@ -34,7 +34,8 @@ enum class PermissionType {
     DEVICE_ADMIN,
     SYSTEM_OVERLAY,
     CAMERA,
-    NOTIFICATIONS
+    NOTIFICATIONS,
+    NOTIFICATION_LISTENER
 }
 
 data class PermissionStepInfo(
