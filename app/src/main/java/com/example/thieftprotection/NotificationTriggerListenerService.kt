@@ -78,7 +78,10 @@ class NotificationTriggerListenerService : NotificationListenerService() {
 
                 if (cleanStop.isNotEmpty() && cleanContent.contains(cleanStop)) {
                     Log.d(TAG, "Stop phrase detected in notification from $packageName! Deactivating AntiTheftService.")
-                    val serviceIntent = Intent(applicationContext, AntiTheftService::class.java)
+                    val serviceIntent = Intent(applicationContext, AntiTheftService::class.java).apply {
+                        action = AntiTheftService.ACTION_STOP_ALARM
+                    }
+                    startService(serviceIntent)
                     stopService(serviceIntent)
                 } else if (cleanTrigger.isNotEmpty() && cleanContent.contains(cleanTrigger)) {
                     Log.d(TAG, "Trigger phrase detected in notification from $packageName! Starting AntiTheftService.")

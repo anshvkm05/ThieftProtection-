@@ -362,7 +362,10 @@ fun MainContainerScreen(refreshTrigger: Int) {
             },
             onToggleTestService = {
                 if (isServiceRunning) {
-                    val serviceIntent = Intent(context, AntiTheftService::class.java)
+                    val serviceIntent = Intent(context, AntiTheftService::class.java).apply {
+                        action = AntiTheftService.ACTION_STOP_ALARM
+                    }
+                    context.startService(serviceIntent)
                     context.stopService(serviceIntent)
                     Toast.makeText(context, "Anti-theft alert deactivated", Toast.LENGTH_SHORT).show()
                 } else {

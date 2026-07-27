@@ -29,7 +29,10 @@ class SmsTriggerReceiver : BroadcastReceiver() {
 
                         if (cleanBody.equals(stopPhrase.trim(), ignoreCase = true)) {
                             Log.d("SmsTriggerReceiver", "Stop phrase match found! Deactivating AntiTheftService.")
-                            val serviceIntent = Intent(context, AntiTheftService::class.java)
+                            val serviceIntent = Intent(context, AntiTheftService::class.java).apply {
+                                action = AntiTheftService.ACTION_STOP_ALARM
+                            }
+                            context.startService(serviceIntent)
                             context.stopService(serviceIntent)
                             break
                         } else if (cleanBody.equals(triggerPhrase.trim(), ignoreCase = true)) {

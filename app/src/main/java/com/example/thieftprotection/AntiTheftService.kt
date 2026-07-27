@@ -42,6 +42,7 @@ import java.util.Locale
 class AntiTheftService : Service() {
 
     companion object {
+        const val ACTION_STOP_ALARM = "com.example.thieftprotection.STOP_ALARM"
         private const val CHANNEL_ID = "SignalLockAlertChannel"
         private const val NOTIFICATION_ID = 4821
         private val _isRunning = MutableStateFlow(false)
@@ -63,6 +64,12 @@ class AntiTheftService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP_ALARM) {
+            Log.d("AntiTheftService", "Received ACTION_STOP_ALARM intent. Stopping service & removing overlay.")
+            stopAlarmAndSelf()
+            return START_NOT_STICKY
+        }
+
         startForegroundServiceWithNotification()
 
         serviceScope.launch {
@@ -244,6 +251,9 @@ class AntiTheftService : Service() {
             return
         }
 
+        // Clean up any previously attached overlay view first to prevent orphan views
+        removeOverlay()
+
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         overlayView = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#FA0B0F19"))
@@ -270,7 +280,7 @@ class AntiTheftService : Service() {
                 setPadding(30, 20, 30, 20)
                 setOnClickListener {
                     Log.d("AntiTheftService", "Deactivate button clicked inside overlay. Stopping service.")
-                    stopSelf()
+                    stopAlarmAndSelf()
                 }
             }
             val buttonParams = LinearLayout.LayoutParams(
@@ -307,9 +317,33 @@ class AntiTheftService : Service() {
 
         try {
             windowManager?.addView(overlayView, params)
+            Log.d("AntiTheftService", "Overlay view successfully added to WindowManager.")
         } catch (e: Exception) {
             Log.e("AntiTheftService", "Failed to add overlay view", e)
         }
+    }
+
+    private fun removeOverlay() {
+        overlayView?.let { view ->
+            try {
+                if (windowManager != null) {
+                    windowManager?.removeViewImmediate(view)
+                }
+            } catch (e: Exception) {
+                try {
+                    windowManager?.removeView(view)
+                } catch (ex: Exception) {
+                    Log.e("AntiTheftService", "Failed to remove overlay view", ex)
+                }
+            }
+            overlayView = null
+            Log.d("AntiTheftService", "Overlay view removed from WindowManager.")
+        }
+    }
+
+    private fun stopAlarmAndSelf() {
+        removeOverlay()
+        stopSelf()
     }
 
     override fun onDestroy() {
@@ -326,20 +360,22 @@ class AntiTheftService : Service() {
             }
         }
 
-        // Remove overlay
-        overlayView?.let { view ->
-            try {
-                windowManager?.removeView(view)
-            } catch (e: Exception) {
-                Log.e("AntiTheftService", "Failed to remove overlay view", e)
-            }
-        }
+        // Remove overlay view synchronously
+        removeOverlay()
 
         // Stop TextToSpeech
         tts?.apply {
             stop()
             shutdown()
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+        Log.d("AntiTheftService", "AntiTheftService onDestroy cleanup complete.")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
