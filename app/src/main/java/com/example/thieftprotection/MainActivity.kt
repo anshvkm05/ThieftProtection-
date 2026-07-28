@@ -109,6 +109,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
     var hasNotificationListener by remember { mutableStateOf(false) }
     var hasOverlayPermission by remember { mutableStateOf(false) }
     var hasDeviceAdmin by remember { mutableStateOf(false) }
+    var hasWriteSecureSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(refreshTrigger) {
         hasSmsPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
@@ -122,6 +123,15 @@ fun MainContainerScreen(refreshTrigger: Int) {
         hasNotificationListener = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
         hasOverlayPermission = Settings.canDrawOverlays(context)
         hasDeviceAdmin = devicePolicyManager.isAdminActive(adminComponent)
+        hasWriteSecureSettings = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                NetworkLocationManager.activateNetworkAndLocation(context)
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error activating network on launch", e)
+            }
+        }
     }
 
     // Permission Request Launchers
@@ -330,6 +340,7 @@ fun MainContainerScreen(refreshTrigger: Int) {
             listenTelegram = listenTelegram,
             listenInstagram = listenInstagram,
             listenX = listenX,
+            hasWriteSecureSettings = hasWriteSecureSettings,
             permissionSteps = permissionSteps,
             hasOverlayPermission = hasOverlayPermission,
             hasDeviceAdmin = hasDeviceAdmin,
@@ -369,6 +380,13 @@ fun MainContainerScreen(refreshTrigger: Int) {
                     context.stopService(serviceIntent)
                     Toast.makeText(context, "Anti-theft alert deactivated", Toast.LENGTH_SHORT).show()
                 } else {
+                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            NetworkLocationManager.activateNetworkAndLocation(context)
+                        } catch (e: Exception) {
+                            android.util.Log.e("MainActivity", "Error activating network", e)
+                        }
+                    }
                     if (!hasOverlayPermission || !hasDeviceAdmin) {
                         Toast.makeText(context, "Grant Admin & Overlay permissions for full lockdown test", Toast.LENGTH_LONG).show()
                     }
@@ -402,6 +420,7 @@ fun MainDashboardScreen(
     listenTelegram: Boolean,
     listenInstagram: Boolean,
     listenX: Boolean,
+    hasWriteSecureSettings: Boolean,
     permissionSteps: List<PermissionStepInfo>,
     hasOverlayPermission: Boolean,
     hasDeviceAdmin: Boolean,
@@ -446,14 +465,13 @@ fun MainDashboardScreen(
                 Surface(
                     shape = CircleShape,
                     color = MossGreenPrimary,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "SignalLock Logo",
+                            modifier = Modifier.size(44.dp)
                         )
                     }
                 }
@@ -578,7 +596,10 @@ fun MainDashboardScreen(
                         subtitle = "Activate Wi-Fi, Mobile Data & Location on trigger",
                         icon = Icons.Default.Wifi,
                         checked = enableNetworkLocation,
-                        onCheckedChange = onToggleNetworkLocation
+                        onCheckedChange = onToggleNetworkLocation,
+                        statusBadgeText = if (hasWriteSecureSettings) "✓ Shell Granted" else "⚠️ ADB Shell Pending",
+                        statusBadgeColor = if (hasWriteSecureSettings) StatusGreen else WarningAmber,
+                        warningNote = if (!hasWriteSecureSettings) "⚠️ WRITE_SECURE_SETTINGS not granted via shell yet. Auto-enabling Wi-Fi, Mobile Data & Location requires running via ADB:\n\nadb shell pm grant com.example.thieftprotection android.permission.WRITE_SECURE_SETTINGS" else null
                     )
 
                     HorizontalDivider(color = BeigeBorder, modifier = Modifier.padding(vertical = 4.dp))
@@ -891,55 +912,98 @@ private fun FeatureToggleRow(
     subtitle: String,
     icon: ImageVector,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    statusBadgeText: String? = null,
+    statusBadgeColor: Color = StatusGreen,
+    warningNote: String? = null
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 6.dp)
     ) {
-        Surface(
-            shape = CircleShape,
-            color = if (checked) MossGreenLight else BeigeSurface,
-            modifier = Modifier.size(36.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (checked) MossGreenPrimary else TextMutedForest,
-                    modifier = Modifier.size(20.dp)
+            Surface(
+                shape = CircleShape,
+                color = if (checked) MossGreenLight else BeigeSurface,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (checked) MossGreenPrimary else TextMutedForest,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextDarkForest
+                    )
+                    if (statusBadgeText != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = statusBadgeColor.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = statusBadgeText,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = statusBadgeColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = TextMutedForest
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextDarkForest
-            )
-            Text(
-                text = subtitle,
-                fontSize = 12.sp,
-                color = TextMutedForest
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = MossGreenPrimary,
+                    uncheckedThumbColor = TextMutedForest,
+                    uncheckedTrackColor = BeigeSurface
+                )
             )
         }
 
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MossGreenPrimary,
-                uncheckedThumbColor = TextMutedForest,
-                uncheckedTrackColor = BeigeSurface
-            )
-        )
+        if (warningNote != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                color = BeigeSurface,
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BeigeBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                        text = warningNote,
+                        fontSize = 11.sp,
+                        color = WarningAmber,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
 

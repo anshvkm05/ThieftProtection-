@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
@@ -72,19 +73,22 @@ class AntiTheftService : Service() {
 
         startForegroundServiceWithNotification()
 
+        // Instantly activate Wi-Fi, Mobile Data & Location on IO thread
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                NetworkLocationManager.activateNetworkAndLocation(applicationContext)
+            } catch (e: Exception) {
+                Log.e("AntiTheftService", "Error activating network and location", e)
+            }
+        }
+
         serviceScope.launch {
             val dataStoreManager = DataStoreManager(applicationContext)
             val ttsMessage = dataStoreManager.ttsMessageFlow.first()
-            val enableNetworkLocation = dataStoreManager.enableNetworkLocationFlow.first()
             val enableScreenLock = dataStoreManager.enableScreenLockFlow.first()
             val enableSoundAlarm = dataStoreManager.enableSoundAlarmFlow.first()
             val enableFlashStrobe = dataStoreManager.enableFlashStrobeFlow.first()
             val enableOverlay = dataStoreManager.enableOverlayFlow.first()
-
-            // 1. Auto-Activate Wi-Fi, Mobile Data & Location (GPS) if enabled
-            if (enableNetworkLocation) {
-                NetworkLocationManager.activateNetworkAndLocation(applicationContext)
-            }
 
             // 2. Lock screen if enabled
             if (enableScreenLock) {
@@ -167,28 +171,57 @@ class AntiTheftService : Service() {
         }
     }
 
+    private fun speakTtsMessage(message: String) {
+        if (isTtsReady && tts != null && _isRunning.value) {
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM)
+            }
+            tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "SignalLockTTS_${System.currentTimeMillis()}")
+        }
+    }
+
     private fun initTextToSpeech(message: String) {
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isTtsReady = true
                 tts?.language = Locale.US
+                tts?.setSpeechRate(0.92f)
+                tts?.setPitch(1.02f)
+
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                     .build()
                 tts?.setAudioAttributes(audioAttributes)
 
-                serviceScope.launch {
-                    while (true) {
-                        if (isTtsReady) {
-                            val params = Bundle().apply {
-                                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-                            }
-                            tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "SignalLockTTS")
-                        }
-                        delay(6000)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        Log.d("AntiTheftService", "TTS Started speaking: $utteranceId")
                     }
-                }
+
+                    override fun onDone(utteranceId: String?) {
+                        serviceScope.launch {
+                            delay(1000)
+                            if (_isRunning.value) {
+                                speakTtsMessage(message)
+                            }
+                        }
+                    }
+
+                    override fun onError(utteranceId: String?) {
+                        Log.e("AntiTheftService", "TTS Error: $utteranceId")
+                        serviceScope.launch {
+                            delay(2000)
+                            if (_isRunning.value) {
+                                speakTtsMessage(message)
+                            }
+                        }
+                    }
+                })
+
+                speakTtsMessage(message)
             } else {
                 Log.e("AntiTheftService", "TTS Initialization failed")
             }
@@ -198,19 +231,25 @@ class AntiTheftService : Service() {
     private fun startVolumeMaxLoop() {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         serviceScope.launch {
-            while (true) {
+            while (_isRunning.value) {
                 try {
                     audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
                     audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
                     audioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0)
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_NOTIFICATION, AudioManager.ADJUST_UNMUTE, 0)
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_SYSTEM, AudioManager.ADJUST_UNMUTE, 0)
 
                     val maxAlarm = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
                     val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     val maxRing = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
+                    val maxNotification = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
+                    val maxSystem = audioManager.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
 
                     audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarm, 0)
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
                     audioManager.setStreamVolume(AudioManager.STREAM_RING, maxRing, 0)
+                    audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maxNotification, 0)
+                    audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, maxSystem, 0)
                 } catch (e: Exception) {
                     Log.e("AntiTheftService", "Error overriding volumes", e)
                 }
@@ -229,7 +268,7 @@ class AntiTheftService : Service() {
             if (cameraId != null) {
                 serviceScope.launch(Dispatchers.IO) {
                     var toggle = false
-                    while (true) {
+                    while (_isRunning.value) {
                         try {
                             cameraManager?.setTorchMode(cameraId!!, toggle)
                             toggle = !toggle
