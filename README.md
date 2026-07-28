@@ -1,6 +1,6 @@
-# 🛡️ SignalLock - Offline Anti-Theft Protection System
+# 🛡️ ThieftProtection - Offline Anti-Theft Protection System
 
-**SignalLock** is an open-source, privacy-first, 100% offline Android anti-theft security system. It allows device owners to remotely trigger emergency lockdown alerts, max volume siren alarms, spoken text-to-speech warnings, camera strobe beacons, and automatic connectivity toggles (Mobile Data, GPS Location, Wi-Fi) using secret SMS commands or notification triggers across modern chat applications (Google Messages, WhatsApp, Telegram, Instagram, and X).
+**ThieftProtection** is an open-source Anti-theft security system, one can track the phone by message enabling location and internet services. It best if you have Esim enabled in your phoen, allows device owners to remotely trigger emergency lockdown alerts, max volume siren alarms, spoken text-to-speech warnings, camera strobe beacons, and automatic connectivity (Mobile Data, GPS Location, Wi-Fi) using secret SMS commands or notification triggers across modern chat applications (Google Messages, WhatsApp, Telegram, Instagram, and X).
 
 ---
 
