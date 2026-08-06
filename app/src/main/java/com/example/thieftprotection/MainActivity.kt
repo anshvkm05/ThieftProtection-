@@ -176,9 +176,9 @@ fun MainContainerScreen(refreshTrigger: Int) {
             icon = Icons.Default.Sms,
             whyRequiredText = "SignalLock monitors incoming SMS messages to detect your secret trigger phrase (e.g. 'SECURE_LOCK') when your phone is lost or stolen. This enables remote alarm activation without an internet connection.",
             howToAllowSteps = listOf(
-                "Tap 'Grant' below to open the system dialog.",
-                "Tap 'Allow' on the Android permission prompt.",
-                "SignalLock will instantly begin monitoring for emergency SMS commands."
+                "If blocked by Android ('App was denied access' / Restricted Setting): Go to device Settings -> Apps -> ThieftProtection -> Tap 3 dots menu (top right) -> Tap 'Allow restricted settings'.",
+                "Tap 'Grant' below to open the system permission dialog.",
+                "Tap 'Allow' on the Android permission prompt."
             ),
             isGranted = hasSmsPermission
         ),
@@ -191,10 +191,10 @@ fun MainContainerScreen(refreshTrigger: Int) {
             icon = Icons.Default.Chat,
             whyRequiredText = "Modern Android messaging apps (Google Messages RCS, WhatsApp, Telegram, Instagram, X) receive messages via push notifications. Notification Access allows SignalLock to detect your secret trigger phrase across all chat platforms.",
             howToAllowSteps = listOf(
+                "If grayed out or blocked: Go to device Settings -> Apps -> ThieftProtection -> Tap 3 dots menu (top right) -> Tap 'Allow restricted settings'.",
                 "Tap 'Grant' below to open Notification Access settings.",
-                "Locate SignalLock in the list and toggle to ON.",
-                "Tap 'Allow' on the confirmation warning prompt.",
-                "WSA / Headless Alt: Run 'adb shell cmd notification allow_listener com.example.thieftprotection/.NotificationTriggerListenerService'"
+                "Locate ThieftProtection in the list and toggle to ON.",
+                "Tap 'Allow' on the confirmation warning prompt."
             ),
             isGranted = hasNotificationListener
         ),

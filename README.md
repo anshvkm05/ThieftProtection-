@@ -32,6 +32,34 @@
 
 ---
 
+## ⚠️ Troubleshooting & Android Security Restrictions
+
+### 1. Google Play Protect Block ("App blocked to protect your device")
+Because **ThieftProtection** is an anti-theft security system distributed directly via side-loaded APK and requests high-level permissions (`RECEIVE_SMS`, `BIND_DEVICE_ADMIN`, `BIND_NOTIFICATION_LISTENER_SERVICE`), Google Play Protect may display an *"App blocked to protect your device"* alert during installation.
+
+* **During Development / Testing**:
+  * **Option A (Install via ADB)**: Running `adb install -g app-debug.apk` bypasses the Play Protect side-load prompt automatically.
+  * **Option B (Disable Play Protect Scanning)**: Open **Google Play Store** ➔ Profile icon ➔ **Play Protect** ➔ Gear icon (top right) ➔ Toggle OFF *"Scan apps with Play Protect"*.
+  * **Option C ("Install anyway")**: On the Play Protect installation prompt, tap **"More details"** ➔ **"Install anyway (unsafe)"**.
+* **For Public Distribution**:
+  * Submit the signed release APK / SHA-256 hash to the [Google Play Protect Developer Appeal Form](https://developers.google.com/android/play-protect/appeals) so Play Protect flags your build as clean software.
+
+---
+
+### 2. Android 13+ Restricted Settings ("App was denied access")
+On **Android 13, 14, and 15**, Android automatically grays out and blocks sensitive permissions (SMS Access, Notification Listener, Accessibility) for side-loaded apps with an *"App was denied access"* popup.
+
+* **How to allow restricted settings on device**:
+  1. Open phone **Settings** ➔ **Apps** ➔ **See all apps** ➔ Tap **ThieftProtection**.
+  2. In the top-right corner of the *App Info* screen, tap the **3 vertical dots menu (`⋮`)**.
+  3. Select **"Allow restricted settings"** (or *Allow restricted permissions*).
+  4. Authenticate with your phone’s **PIN, Pattern, or Fingerprint**.
+  5. Re-open **ThieftProtection** and grant the required permissions normally!
+* **Automatic Bypass via ADB**:
+  Installing via ADB (`adb install -g app-debug.apk`) or running `adb shell appops set com.example.thieftprotection ACCESS_RESTRICTED_SETTINGS allow` bypasses Restricted Settings automatically.
+
+---
+
 ### Option A: Setup via PC / Laptop (Standard ADB)
 
 If you have access to a computer with Android Debug Bridge (ADB) installed:
