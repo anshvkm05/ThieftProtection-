@@ -21,11 +21,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(providers.gradleProperty("MY_KEYSTORE_PATH").get())
+            storePassword = providers.gradleProperty("MY_KEYSTORE_PASSWORD").get()
+            keyAlias = providers.gradleProperty("MY_KEY_ALIAS").get()
+            keyPassword = providers.gradleProperty("MY_KEY_PASSWORD").get()
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = false
             }
+            isMinifyEnabled = false
         }
     }
     compileOptions {
@@ -34,6 +48,14 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            output.outputFileName = "ThieftProtection-v${variant.versionName}-${variant.buildType.name}.apk"
+        }
     }
 }
 

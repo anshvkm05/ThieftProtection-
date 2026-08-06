@@ -13,9 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
-Implementation.md 
-.\Implementation.md
 Implementation.md
-Implementation.md
-.gitignore
 app/release
+gradle.properties
